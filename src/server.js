@@ -8,6 +8,7 @@ const {
 } = require('plaid');
 const {
   addItem,
+  backfillTransactionSources,
   getItem,
   listItems,
   listTransactions,
@@ -177,7 +178,7 @@ app.post('/api/items/:itemId/sync', async (request, response, next) => {
       hasMore = plaidResponse.data.has_more;
     }
 
-    upsertTransactions([...added, ...modified]);
+    upsertTransactions([...added, ...modified], item);
     removeTransactions(removed);
     updateItemCursor(item.itemId, cursor);
 
@@ -194,6 +195,7 @@ app.post('/api/items/:itemId/sync', async (request, response, next) => {
 
 app.get('/api/transactions', (request, response) => {
   const limit = Number(request.query.limit || 100);
+  backfillTransactionSources();
   response.json({ transactions: listTransactions(limit) });
 });
 

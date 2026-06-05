@@ -40,6 +40,20 @@ function accountLabel(account) {
   return `${name}${mask}`;
 }
 
+function transactionSourceLabel(transaction) {
+  const source = transaction.source;
+
+  if (!source) {
+    return 'Source unknown';
+  }
+
+  const institution = source.institutionName || source.institutionId || 'Unknown institution';
+  const account = source.accountName || source.accountSubtype || 'Account';
+  const mask = source.accountMask ? ` •••• ${source.accountMask}` : '';
+
+  return `${institution} · ${account}${mask}`;
+}
+
 async function loadHealth() {
   try {
     const health = await api('/api/health');
@@ -89,7 +103,7 @@ async function loadTransactions() {
     <article class="transaction">
       <div>
         <strong>${transaction.merchant_name || transaction.name}</strong>
-        <span>${transaction.date}</span>
+        <span>${transaction.date} · ${transactionSourceLabel(transaction)}</span>
       </div>
       <div class="amount">${formatCurrency(transaction.amount)}</div>
     </article>

@@ -65,11 +65,33 @@ function updateItemCursor(itemId, cursor) {
   writeStore(store);
 }
 
-function upsertTransactions(transactions) {
+function enrichTransactionSource(transaction, item) {
+  const account = item.accounts.find((storedAccount) => (
+    storedAccount.id === transaction.account_id
+    || storedAccount.account_id === transaction.account_id
+  ));
+
+  return {
+    ...transaction,
+    source: {
+      itemId: item.itemId,
+      institutionName: item.institution?.name || null,
+      institutionId: item.institution?.institution_id || null,
+      accountId: transaction.account_id,
+      accountName: account?.name || account?.official_name || null,
+      accountMask: account?.mask || null,
+      accountSubtype: account?.subtype || null,
+    },
+  };
+}
+
+function upsertTransactions(transactions, item) {
   const store = readStore();
 
   for (const transaction of transactions) {
-    store.transactions[transaction.transaction_id] = transaction;
+    store.transactions[transaction.transaction_id] = item
+      ? enrichTransactionSource(transaction, item)
+      : transaction;
   }
 
   writeStore(store);
@@ -85,6 +107,35 @@ function removeTransactions(removedTransactions) {
   writeStore(store);
 }
 
+function backfillTransactionSources() {
+  const store = readStore();
+  let updated = 0;
+
+  for (const transaction of Object.values(store.transactions)) {
+    if (transaction.source) {
+      continue;
+    }
+
+    const item = store.items.find((storedItem) => storedItem.accounts.some((account) => (
+      account.id === transaction.account_id
+      || account.account_id === transaction.account_id
+    )));
+
+    if (!item) {
+      continue;
+    }
+
+    store.transactions[transaction.transaction_id] = enrichTransactionSource(transaction, item);
+    updated += 1;
+  }
+
+  if (updated > 0) {
+    writeStore(store);
+  }
+
+  return updated;
+}
+
 function listTransactions(limit = 100) {
   return Object.values(readStore().transactions)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -93,6 +144,7 @@ function listTransactions(limit = 100) {
 
 module.exports = {
   addItem,
+  backfillTransactionSources,
   getItem,
   listItems,
   listTransactions,
