@@ -65,6 +65,22 @@ function updateItemCursor(itemId, cursor) {
   writeStore(store);
 }
 
+function updateItemAccounts(itemId, accounts) {
+  const store = readStore();
+  const item = store.items.find((stored) => stored.itemId === itemId);
+
+  if (!item) {
+    return null;
+  }
+
+  item.accounts = accounts;
+  item.lastBalanceRefreshAt = new Date().toISOString();
+  writeStore(store);
+
+  const { accessToken, ...safeItem } = item;
+  return safeItem;
+}
+
 function enrichTransactionSource(transaction, item) {
   const account = item.accounts.find((storedAccount) => (
     storedAccount.id === transaction.account_id
@@ -149,6 +165,7 @@ module.exports = {
   listItems,
   listTransactions,
   removeTransactions,
+  updateItemAccounts,
   updateItemCursor,
   upsertTransactions,
 };

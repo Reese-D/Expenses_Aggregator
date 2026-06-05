@@ -4,6 +4,9 @@ const refreshItemsButton = document.querySelector('#refreshItemsButton');
 const refreshTransactionsButton = document.querySelector('#refreshTransactionsButton');
 const itemsEl = document.querySelector('#items');
 const transactionsEl = document.querySelector('#transactions');
+const netBalanceEl = document.querySelector('#netBalance');
+const cashBalanceEl = document.querySelector('#cashBalance');
+const cardDebtEl = document.querySelector('#cardDebt');
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -40,6 +43,107 @@ function accountLabel(account) {
   return `${name}${mask}`;
 }
 
+function accountBalanceLabel(account) {
+  const balances = account.balances;
+
+  if (!balances) {
+    return 'Balance not refreshed';
+  }
+
+  if (account.type === 'credit') {
+    const owed = balances.current ?? 0;
+    const available = balances.available;
+    const limit = balances.limit;
+    const details = [];
+
+    if (available !== null && available !== undefined) {
+      details.push(`available ${formatCurrency(available)}`);
+    }
+
+    if (limit !== null && limit !== undefined) {
+      details.push(`limit ${formatCurrency(limit)}`);
+    }
+
+    return `Owed ${formatCurrency(owed)}${details.length ? ` (${details.join(', ')})` : ''}`;
+  }
+
+  const available = balances.available;
+  const current = balances.current;
+
+  if (available !== null && available !== undefined) {
+    return `Available ${formatCurrency(available)}${current !== null && current !== undefined ? ` (current ${formatCurrency(current)})` : ''}`;
+  }
+
+  if (current !== null && current !== undefined) {
+    return `Current ${formatCurrency(current)}`;
+  }
+
+  return 'Balance unavailable';
+}
+
+function accountNetValue(account) {
+  const balances = account.balances;
+
+  if (!balances) {
+    return null;
+  }
+
+  if (account.type === 'credit') {
+    if (balances.current === null || balances.current === undefined) {
+      return null;
+    }
+
+    return -balances.current;
+  }
+
+  const value = balances.available ?? balances.current;
+
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return value;
+}
+
+function balanceSummary(items) {
+  return items.reduce((summary, item) => {
+    for (const account of item.accounts || []) {
+      const value = accountNetValue(account);
+
+      if (value === null) {
+        summary.missing += 1;
+        continue;
+      }
+
+      if (account.type === 'credit') {
+        summary.cardDebt -= value;
+      } else {
+        summary.cash += value;
+      }
+    }
+
+    return summary;
+  }, {
+    cash: 0,
+    cardDebt: 0,
+    missing: 0,
+  });
+}
+
+function renderBalanceSummary(items) {
+  const summary = balanceSummary(items);
+  const net = summary.cash - summary.cardDebt;
+
+  netBalanceEl.textContent = formatCurrency(net);
+  cashBalanceEl.textContent = formatCurrency(summary.cash);
+  cardDebtEl.textContent = formatCurrency(summary.cardDebt);
+  netBalanceEl.classList.toggle('negative', net < 0);
+
+  if (summary.missing > 0) {
+    statusEl.textContent = `${summary.missing} account balance${summary.missing === 1 ? '' : 's'} not refreshed yet.`;
+  }
+}
+
 function transactionSourceLabel(transaction) {
   const source = transaction.source;
 
@@ -67,6 +171,7 @@ async function loadHealth() {
 
 async function loadItems() {
   const { items } = await api('/api/items');
+  renderBalanceSummary(items);
 
   if (!items.length) {
     itemsEl.innerHTML = '<p class="empty">No accounts linked yet.</p>';
@@ -75,7 +180,12 @@ async function loadItems() {
 
   itemsEl.innerHTML = items.map((item) => {
     const accounts = item.accounts?.length
-      ? item.accounts.map((account) => `<li>${accountLabel(account)}</li>`).join('')
+      ? item.accounts.map((account) => `
+        <li>
+          <span>${accountLabel(account)}</span>
+          <strong>${accountBalanceLabel(account)}</strong>
+        </li>
+      `).join('')
       : '<li>No selected account metadata returned.</li>';
 
     return `
@@ -85,7 +195,10 @@ async function loadItems() {
           <p>Item ID: ${item.itemId}</p>
           <ul>${accounts}</ul>
         </div>
-        <button type="button" data-sync="${item.itemId}">Sync</button>
+        <div class="item-actions">
+          <button type="button" data-balance="${item.itemId}">Refresh balances</button>
+          <button type="button" data-sync="${item.itemId}">Sync</button>
+        </div>
       </article>
     `;
   }).join('');
@@ -151,26 +264,32 @@ async function connectAccount() {
 
 itemsEl.addEventListener('click', async (event) => {
   const syncItemId = event.target.dataset.sync;
+  const balanceItemId = event.target.dataset.balance;
 
-  if (!syncItemId) {
+  if (!syncItemId && !balanceItemId) {
     return;
   }
 
   event.target.disabled = true;
-  event.target.textContent = 'Syncing...';
+  event.target.textContent = syncItemId ? 'Syncing...' : 'Refreshing...';
 
   try {
-    await api(`/api/items/${syncItemId}/sync`, {
+    const itemId = syncItemId || balanceItemId;
+    const action = syncItemId ? 'sync' : 'balances';
+
+    await api(`/api/items/${itemId}/${action}`, {
       method: 'POST',
       body: JSON.stringify({}),
     });
     await loadItems();
-    await loadTransactions();
+    if (syncItemId) {
+      await loadTransactions();
+    }
   } catch (error) {
     statusEl.textContent = error.message;
   } finally {
     event.target.disabled = false;
-    event.target.textContent = 'Sync';
+    event.target.textContent = syncItemId ? 'Sync' : 'Refresh balances';
   }
 });
 

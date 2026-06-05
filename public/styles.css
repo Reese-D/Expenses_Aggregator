@@ -76,6 +76,39 @@ p {
   margin-top: 24px;
 }
 
+.summary {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.summary div {
+  border: 1px solid #d9e0e6;
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.summary span {
+  display: block;
+  color: #586978;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.summary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.summary strong.negative {
+  color: #a33a2b;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -105,6 +138,27 @@ p {
   margin: 10px 0 0;
   padding-left: 18px;
   color: #344554;
+}
+
+.item li {
+  margin-top: 8px;
+}
+
+.item li span,
+.item li strong {
+  display: block;
+}
+
+.item li strong {
+  margin-top: 2px;
+  color: #17202a;
+  font-weight: 700;
+}
+
+.item-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .transactions {
@@ -145,5 +199,13 @@ p {
 
   button {
     width: 100%;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .item-actions {
+    flex-direction: column;
   }
 }

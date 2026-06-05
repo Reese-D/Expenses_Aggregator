@@ -13,6 +13,7 @@ const {
   listItems,
   listTransactions,
   removeTransactions,
+  updateItemAccounts,
   updateItemCursor,
   upsertTransactions,
 } = require('./store');
@@ -62,6 +63,14 @@ function createPlaidClient() {
   });
 
   return new PlaidApi(configuration);
+}
+
+async function refreshItemBalances(client, item) {
+  const plaidResponse = await client.accountsBalanceGet({
+    access_token: item.accessToken,
+  });
+
+  return updateItemAccounts(item.itemId, plaidResponse.data.accounts);
 }
 
 app.use(express.json());
@@ -188,6 +197,24 @@ app.post('/api/items/:itemId/sync', async (request, response, next) => {
       removed: removed.length,
       nextCursor: cursor,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/items/:itemId/balances', async (request, response, next) => {
+  try {
+    const item = getItem(request.params.itemId);
+
+    if (!item) {
+      response.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    const client = createPlaidClient();
+    const updatedItem = await refreshItemBalances(client, item);
+
+    response.json({ item: updatedItem });
   } catch (error) {
     next(error);
   }
