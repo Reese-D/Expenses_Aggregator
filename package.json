@@ -1,0 +1,16 @@
+{
+  "name": "expenses-aggregator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal expense aggregator using Plaid Link and Transactions Sync.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "plaid": "^30.0.0"
+  }
+}

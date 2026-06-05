@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expenses Aggregator</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>Expenses Aggregator</h1>
+          <p id="status">Checking Plaid configuration...</p>
+        </div>
+        <button id="connectButton" type="button">Connect account</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Linked Items</h2>
+          <button id="refreshItemsButton" type="button">Refresh</button>
+        </div>
+        <div id="items" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recent Transactions</h2>
+          <button id="refreshTransactionsButton" type="button">Refresh</button>
+        </div>
+        <div id="transactions" class="transactions"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
