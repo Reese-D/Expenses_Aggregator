@@ -35,6 +35,10 @@ function listItems() {
   return readStore().items.map(({ accessToken, ...safeItem }) => safeItem);
 }
 
+function listStoredItems() {
+  return readStore().items;
+}
+
 function addItem(item) {
   const store = readStore();
   const existingIndex = store.items.findIndex((stored) => stored.itemId === item.itemId);
@@ -158,12 +162,67 @@ function listTransactions(limit = 100) {
     .slice(0, limit);
 }
 
+function amountToCents(amount) {
+  return Math.round(amount * 100);
+}
+
+function isExpenseExcluded(transaction) {
+  const primaryCategory = transaction.personal_finance_category?.primary;
+  const detailedCategory = transaction.personal_finance_category?.detailed;
+
+  return detailedCategory === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT'
+    || primaryCategory === 'TRANSFER_IN'
+    || primaryCategory === 'TRANSFER_OUT';
+}
+
+function monthlyExpenseSummary(date = new Date()) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const transactions = Object.values(readStore().transactions);
+  let totalCents = 0;
+  let excludedCents = 0;
+  let count = 0;
+  let excludedCount = 0;
+
+  for (const transaction of transactions) {
+    if (!transaction.date || transaction.amount <= 0) {
+      continue;
+    }
+
+    const transactionDate = new Date(`${transaction.date}T00:00:00`);
+
+    if (transactionDate.getFullYear() !== year || transactionDate.getMonth() !== month) {
+      continue;
+    }
+
+    if (isExpenseExcluded(transaction)) {
+      excludedCents += amountToCents(transaction.amount);
+      excludedCount += 1;
+      continue;
+    }
+
+    totalCents += amountToCents(transaction.amount);
+    count += 1;
+  }
+
+  return {
+    total: totalCents / 100,
+    count,
+    excludedTotal: excludedCents / 100,
+    excludedCount,
+    year,
+    month: month + 1,
+  };
+}
+
 module.exports = {
   addItem,
   backfillTransactionSources,
   getItem,
   listItems,
+  listStoredItems,
   listTransactions,
+  monthlyExpenseSummary,
   removeTransactions,
   updateItemAccounts,
   updateItemCursor,

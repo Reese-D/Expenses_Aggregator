@@ -11,7 +11,9 @@ const {
   backfillTransactionSources,
   getItem,
   listItems,
+  listStoredItems,
   listTransactions,
+  monthlyExpenseSummary,
   removeTransactions,
   updateItemAccounts,
   updateItemCursor,
@@ -71,6 +73,41 @@ async function refreshItemBalances(client, item) {
   });
 
   return updateItemAccounts(item.itemId, plaidResponse.data.accounts);
+}
+
+async function syncItemTransactions(client, item) {
+  let cursor = item.cursor;
+  let hasMore = true;
+  const added = [];
+  const modified = [];
+  const removed = [];
+
+  while (hasMore) {
+    const plaidResponse = await client.transactionsSync({
+      access_token: item.accessToken,
+      cursor,
+    });
+
+    added.push(...plaidResponse.data.added);
+    modified.push(...plaidResponse.data.modified);
+    removed.push(...plaidResponse.data.removed);
+
+    cursor = plaidResponse.data.next_cursor;
+    hasMore = plaidResponse.data.has_more;
+  }
+
+  upsertTransactions([...added, ...modified], item);
+  removeTransactions(removed);
+  updateItemCursor(item.itemId, cursor);
+
+  return {
+    itemId: item.itemId,
+    institutionName: item.institution?.name || item.institution?.institution_id || 'Unknown institution',
+    added: added.length,
+    modified: modified.length,
+    removed: removed.length,
+    nextCursor: cursor,
+  };
 }
 
 app.use(express.json());
@@ -167,35 +204,27 @@ app.post('/api/items/:itemId/sync', async (request, response, next) => {
     }
 
     const client = createPlaidClient();
-    let cursor = item.cursor;
-    let hasMore = true;
-    const added = [];
-    const modified = [];
-    const removed = [];
+    response.json(await syncItemTransactions(client, item));
+  } catch (error) {
+    next(error);
+  }
+});
 
-    while (hasMore) {
-      const plaidResponse = await client.transactionsSync({
-        access_token: item.accessToken,
-        cursor,
-      });
+app.post('/api/transactions/sync', async (request, response, next) => {
+  try {
+    const client = createPlaidClient();
+    const results = [];
 
-      added.push(...plaidResponse.data.added);
-      modified.push(...plaidResponse.data.modified);
-      removed.push(...plaidResponse.data.removed);
-
-      cursor = plaidResponse.data.next_cursor;
-      hasMore = plaidResponse.data.has_more;
+    for (const item of listStoredItems()) {
+      results.push(await syncItemTransactions(client, item));
     }
 
-    upsertTransactions([...added, ...modified], item);
-    removeTransactions(removed);
-    updateItemCursor(item.itemId, cursor);
-
     response.json({
-      added: added.length,
-      modified: modified.length,
-      removed: removed.length,
-      nextCursor: cursor,
+      items: results.length,
+      added: results.reduce((total, result) => total + result.added, 0),
+      modified: results.reduce((total, result) => total + result.modified, 0),
+      removed: results.reduce((total, result) => total + result.removed, 0),
+      results,
     });
   } catch (error) {
     next(error);
@@ -224,6 +253,10 @@ app.get('/api/transactions', (request, response) => {
   const limit = Number(request.query.limit || 100);
   backfillTransactionSources();
   response.json({ transactions: listTransactions(limit) });
+});
+
+app.get('/api/transactions/monthly-summary', (request, response) => {
+  response.json(monthlyExpenseSummary());
 });
 
 app.use((error, request, response, next) => {

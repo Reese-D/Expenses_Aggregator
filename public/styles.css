@@ -78,7 +78,7 @@ p {
 
 .summary {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-top: 24px;
 }
@@ -103,6 +103,13 @@ p {
   margin-top: 6px;
   font-size: 24px;
   line-height: 1.2;
+}
+
+.summary small {
+  display: block;
+  margin-top: 6px;
+  color: #687887;
+  font-size: 13px;
 }
 
 .summary strong.negative {

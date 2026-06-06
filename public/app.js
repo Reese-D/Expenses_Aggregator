@@ -7,6 +7,8 @@ const transactionsEl = document.querySelector('#transactions');
 const netBalanceEl = document.querySelector('#netBalance');
 const cashBalanceEl = document.querySelector('#cashBalance');
 const cardDebtEl = document.querySelector('#cardDebt');
+const monthlyExpensesEl = document.querySelector('#monthlyExpenses');
+const monthlyExpensesMetaEl = document.querySelector('#monthlyExpensesMeta');
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -144,6 +146,12 @@ function renderBalanceSummary(items) {
   }
 }
 
+async function loadMonthlyExpenses() {
+  const summary = await api('/api/transactions/monthly-summary');
+  monthlyExpensesEl.textContent = formatCurrency(summary.total);
+  monthlyExpensesMetaEl.textContent = `${summary.count} expenses · ${summary.excludedCount} transfers excluded`;
+}
+
 function transactionSourceLabel(transaction) {
   const source = transaction.source;
 
@@ -206,6 +214,7 @@ async function loadItems() {
 
 async function loadTransactions() {
   const { transactions } = await api('/api/transactions?limit=100');
+  await loadMonthlyExpenses();
 
   if (!transactions.length) {
     transactionsEl.innerHTML = '<p class="empty">No synced transactions yet.</p>';
@@ -221,6 +230,27 @@ async function loadTransactions() {
       <div class="amount">${formatCurrency(transaction.amount)}</div>
     </article>
   `).join('');
+}
+
+async function syncTransactions() {
+  refreshTransactionsButton.disabled = true;
+  refreshTransactionsButton.textContent = 'Syncing...';
+  statusEl.textContent = 'Syncing transactions from Plaid...';
+
+  try {
+    const result = await api('/api/transactions/sync', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    await loadTransactions();
+    statusEl.textContent = `Synced ${result.items} linked item${result.items === 1 ? '' : 's'}: ${result.added} added, ${result.modified} modified, ${result.removed} removed.`;
+  } catch (error) {
+    statusEl.textContent = error.message;
+  } finally {
+    refreshTransactionsButton.disabled = false;
+    refreshTransactionsButton.textContent = 'Refresh';
+  }
 }
 
 async function connectAccount() {
@@ -295,8 +325,9 @@ itemsEl.addEventListener('click', async (event) => {
 
 connectButton.addEventListener('click', connectAccount);
 refreshItemsButton.addEventListener('click', loadItems);
-refreshTransactionsButton.addEventListener('click', loadTransactions);
+refreshTransactionsButton.addEventListener('click', syncTransactions);
 
 loadHealth();
 loadItems();
 loadTransactions();
+loadMonthlyExpenses();
