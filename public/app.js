@@ -225,15 +225,20 @@ async function loadTransactions() {
     return;
   }
 
-  transactionsEl.innerHTML = transactions.map((transaction) => `
-    <article class="transaction">
-      <div>
-        <strong>${transaction.merchant_name || transaction.name}</strong>
-        <span>${transaction.date} · ${transactionSourceLabel(transaction)}</span>
-      </div>
-      <div class="amount">${formatCurrency(transaction.amount)}</div>
-    </article>
-  `).join('');
+  transactionsEl.innerHTML = transactions.map((transaction) => {
+    const pendingBadge = transaction.pending
+      ? '<span class="badge pending">Pending</span>'
+      : '';
+    return `
+      <article class="transaction">
+        <div>
+          <strong>${transaction.merchant_name || transaction.name} ${pendingBadge}</strong>
+          <span>${transaction.date} · ${transactionSourceLabel(transaction)}</span>
+        </div>
+        <div class="amount${transaction.pending ? ' pending' : ''}">${formatCurrency(transaction.amount)}</div>
+      </article>
+    `;
+  }).join('');
 }
 
 async function syncTransactions() {

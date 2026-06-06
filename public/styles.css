@@ -189,6 +189,10 @@ p {
   font-weight: 700;
 }
 
+.amount.pending {
+  color: #8a5a00;
+}
+
 .empty {
   border: 1px dashed #b8c3cc;
   border-radius: 8px;
@@ -214,6 +218,11 @@ p {
   letter-spacing: 0.03em;
   background: #edf1f4;
   color: #586978;
+}
+
+.badge.pending {
+  background: #fff4e0;
+  color: #8a5a00;
 }
 
 .badge.early {
