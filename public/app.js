@@ -87,6 +87,15 @@ function accountBalanceLabel(account) {
   return 'Balance unavailable';
 }
 
+function accountHeldLabel(account) {
+  if (account.type === 'credit') return null;
+  const { available, current } = account.balances || {};
+  if (available == null || current == null) return null;
+  const held = Math.round((current - available) * 100) / 100;
+  if (held <= 0) return null;
+  return `${formatCurrency(held)} held · pending authorization${held !== 1 ? 's' : ''} not yet posted`;
+}
+
 function accountNetValue(account) {
   const balances = account.balances;
 
@@ -192,12 +201,16 @@ async function loadItems() {
 
   itemsEl.innerHTML = items.map((item) => {
     const accounts = item.accounts?.length
-      ? item.accounts.map((account) => `
-        <li>
-          <span>${accountLabel(account)}</span>
-          <strong>${accountBalanceLabel(account)}</strong>
-        </li>
-      `).join('')
+      ? item.accounts.map((account) => {
+          const held = accountHeldLabel(account);
+          return `
+            <li>
+              <span>${accountLabel(account)}</span>
+              <strong>${accountBalanceLabel(account)}</strong>
+              ${held ? `<small class="held-notice">${held}</small>` : ''}
+            </li>
+          `;
+        }).join('')
       : '<li>No selected account metadata returned.</li>';
 
     return `
