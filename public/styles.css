@@ -78,7 +78,7 @@ p {
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 24px;
 }
@@ -194,6 +194,48 @@ p {
   border-radius: 8px;
   padding: 18px;
   background: #ffffff;
+}
+
+.subscription-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #edf1f4;
+  color: #586978;
+}
+
+.badge.early {
+  background: #fff4e0;
+  color: #8a5a00;
+}
+
+.badge.tombstoned {
+  background: #f5e6e4;
+  color: #7a2e24;
+}
+
+.subscription-monthly {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.subscription-monthly small {
+  display: block;
+  margin-top: 2px;
+  color: #687887;
+  font-size: 12px;
 }
 
 @media (max-width: 700px) {

@@ -35,6 +35,11 @@
           <strong id="monthlyExpenses">$0.00</strong>
           <small id="monthlyExpensesMeta">Transfers excluded</small>
         </div>
+        <div>
+          <span>Monthly Subscriptions</span>
+          <strong id="monthlySubscriptions">—</strong>
+          <small id="monthlySubscriptionsMeta">Not yet synced</small>
+        </div>
       </section>
 
       <section class="panel">
@@ -51,6 +56,14 @@
           <button id="refreshTransactionsButton" type="button">Refresh</button>
         </div>
         <div id="transactions" class="transactions"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recurring Subscriptions</h2>
+          <button id="refreshSubscriptionsButton" type="button">Sync</button>
+        </div>
+        <div id="subscriptions" class="transactions"></div>
       </section>
     </main>
 

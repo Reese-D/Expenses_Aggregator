@@ -10,11 +10,13 @@ const {
   addItem,
   backfillTransactionSources,
   getItem,
+  getRecurringStreams,
   listItems,
   listStoredItems,
   listTransactions,
   monthlyExpenseSummary,
   removeTransactions,
+  setRecurringStreams,
   updateItemAccounts,
   updateItemCursor,
   upsertTransactions,
@@ -257,6 +259,55 @@ app.get('/api/transactions', (request, response) => {
 
 app.get('/api/transactions/monthly-summary', (request, response) => {
   response.json(monthlyExpenseSummary());
+});
+
+app.get('/api/subscriptions', (request, response) => {
+  const cached = getRecurringStreams();
+  response.json(cached || { outflow: [], inflow: [], lastRefreshedAt: null });
+});
+
+app.post('/api/subscriptions/sync', async (request, response, next) => {
+  try {
+    const client = createPlaidClient();
+    const items = listStoredItems();
+    const allOutflow = [];
+    const allInflow = [];
+
+    for (const item of items) {
+      const plaidResponse = await client.transactionsRecurringGet({
+        access_token: item.accessToken,
+        options: { include_personal_finance_category: true },
+      });
+
+      const accountMap = Object.fromEntries(
+        (item.accounts || []).map((a) => [a.account_id || a.id, a])
+      );
+
+      const enrichStream = (stream) => {
+        const account = accountMap[stream.account_id] || {};
+        return {
+          ...stream,
+          source: {
+            itemId: item.itemId,
+            institutionName: item.institution?.name || null,
+            institutionId: item.institution?.institution_id || null,
+            accountId: stream.account_id,
+            accountName: account.name || account.official_name || null,
+            accountMask: account.mask || null,
+            accountSubtype: account.subtype || null,
+          },
+        };
+      };
+
+      allOutflow.push(...plaidResponse.data.outflow_streams.map(enrichStream));
+      allInflow.push(...plaidResponse.data.inflow_streams.map(enrichStream));
+    }
+
+    const stored = setRecurringStreams(allOutflow, allInflow);
+    response.json(stored);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use((error, request, response, next) => {

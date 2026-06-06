@@ -8,6 +8,7 @@ function emptyStore() {
   return {
     items: [],
     transactions: {},
+    recurringStreams: null,
   };
 }
 
@@ -156,6 +157,21 @@ function backfillTransactionSources() {
   return updated;
 }
 
+function getRecurringStreams() {
+  return readStore().recurringStreams || null;
+}
+
+function setRecurringStreams(outflow, inflow) {
+  const store = readStore();
+  store.recurringStreams = {
+    outflow,
+    inflow,
+    lastRefreshedAt: new Date().toISOString(),
+  };
+  writeStore(store);
+  return store.recurringStreams;
+}
+
 function listTransactions(limit = 100) {
   return Object.values(readStore().transactions)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -219,11 +235,13 @@ module.exports = {
   addItem,
   backfillTransactionSources,
   getItem,
+  getRecurringStreams,
   listItems,
   listStoredItems,
   listTransactions,
   monthlyExpenseSummary,
   removeTransactions,
+  setRecurringStreams,
   updateItemAccounts,
   updateItemCursor,
   upsertTransactions,

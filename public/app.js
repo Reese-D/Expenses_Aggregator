@@ -2,13 +2,17 @@ const statusEl = document.querySelector('#status');
 const connectButton = document.querySelector('#connectButton');
 const refreshItemsButton = document.querySelector('#refreshItemsButton');
 const refreshTransactionsButton = document.querySelector('#refreshTransactionsButton');
+const refreshSubscriptionsButton = document.querySelector('#refreshSubscriptionsButton');
 const itemsEl = document.querySelector('#items');
 const transactionsEl = document.querySelector('#transactions');
+const subscriptionsEl = document.querySelector('#subscriptions');
 const netBalanceEl = document.querySelector('#netBalance');
 const cashBalanceEl = document.querySelector('#cashBalance');
 const cardDebtEl = document.querySelector('#cardDebt');
 const monthlyExpensesEl = document.querySelector('#monthlyExpenses');
 const monthlyExpensesMetaEl = document.querySelector('#monthlyExpensesMeta');
+const monthlySubscriptionsEl = document.querySelector('#monthlySubscriptions');
+const monthlySubscriptionsMetaEl = document.querySelector('#monthlySubscriptionsMeta');
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -292,6 +296,113 @@ async function connectAccount() {
   }
 }
 
+const FREQUENCY_LABELS = {
+  WEEKLY: 'Weekly',
+  BIWEEKLY: 'Biweekly',
+  SEMI_MONTHLY: 'Twice/month',
+  MONTHLY: 'Monthly',
+  ANNUALLY: 'Annual',
+  UNKNOWN: 'Recurring',
+};
+
+function streamMonthlyAmount(stream) {
+  const amount = stream.average_amount?.amount ?? stream.last_amount?.amount ?? 0;
+  switch (stream.frequency) {
+    case 'WEEKLY': return amount * (52 / 12);
+    case 'BIWEEKLY': return amount * (26 / 12);
+    case 'SEMI_MONTHLY': return amount * 2;
+    case 'MONTHLY': return amount;
+    case 'ANNUALLY': return amount / 12;
+    default: return amount;
+  }
+}
+
+function streamSourceLabel(stream) {
+  const source = stream.source;
+  if (!source) return '';
+  const institution = source.institutionName || source.institutionId || 'Unknown institution';
+  const account = source.accountName || source.accountSubtype || 'Account';
+  const mask = source.accountMask ? ` •••• ${source.accountMask}` : '';
+  return `${institution} · ${account}${mask}`;
+}
+
+function renderSubscriptions(data) {
+  const outflow = (data.outflow || []).filter((s) => s.is_active !== false);
+  const sorted = [...outflow].sort((a, b) => streamMonthlyAmount(b) - streamMonthlyAmount(a));
+
+  const totalMonthly = sorted.reduce((sum, s) => sum + streamMonthlyAmount(s), 0);
+  monthlySubscriptionsEl.textContent = formatCurrency(totalMonthly);
+
+  const lastRefreshed = data.lastRefreshedAt
+    ? new Date(data.lastRefreshedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+  monthlySubscriptionsMetaEl.textContent = lastRefreshed
+    ? `${sorted.length} active · refreshed ${lastRefreshed}`
+    : `${sorted.length} active`;
+
+  if (!sorted.length) {
+    subscriptionsEl.innerHTML = '<p class="empty">No recurring subscriptions found. Sync to detect them from your transaction history.</p>';
+    return;
+  }
+
+  subscriptionsEl.innerHTML = sorted.map((stream) => {
+    const name = stream.merchant_name || stream.description || 'Unknown';
+    const lastAmount = stream.last_amount?.amount ?? stream.average_amount?.amount ?? 0;
+    const freq = FREQUENCY_LABELS[stream.frequency] || 'Recurring';
+    const monthly = streamMonthlyAmount(stream);
+    const source = streamSourceLabel(stream);
+
+    let statusBadge = '';
+    if (stream.status === 'EARLY_DETECTION') {
+      statusBadge = '<span class="badge early">New</span>';
+    } else if (stream.status === 'TOMBSTONED') {
+      statusBadge = '<span class="badge tombstoned">Inactive</span>';
+    }
+
+    return `
+      <article class="transaction">
+        <div>
+          <strong>${name}</strong>
+          <div class="subscription-meta">
+            <span class="badge">${freq} · ${formatCurrency(lastAmount)}</span>
+            ${statusBadge}
+            <span style="color:#687887;font-size:14px">${source}</span>
+          </div>
+        </div>
+        <div class="subscription-monthly">
+          <strong>${formatCurrency(monthly)}</strong>
+          <small>/mo est.</small>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadSubscriptions() {
+  const data = await api('/api/subscriptions');
+  renderSubscriptions(data);
+}
+
+async function syncSubscriptions() {
+  refreshSubscriptionsButton.disabled = true;
+  refreshSubscriptionsButton.textContent = 'Syncing...';
+  statusEl.textContent = 'Fetching recurring transactions from Plaid...';
+
+  try {
+    const data = await api('/api/subscriptions/sync', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    renderSubscriptions(data);
+    statusEl.textContent = `Found ${(data.outflow || []).length} recurring outflow stream${(data.outflow || []).length === 1 ? '' : 's'}.`;
+  } catch (error) {
+    statusEl.textContent = error.message;
+  } finally {
+    refreshSubscriptionsButton.disabled = false;
+    refreshSubscriptionsButton.textContent = 'Sync';
+  }
+}
+
 itemsEl.addEventListener('click', async (event) => {
   const syncItemId = event.target.dataset.sync;
   const balanceItemId = event.target.dataset.balance;
@@ -326,8 +437,10 @@ itemsEl.addEventListener('click', async (event) => {
 connectButton.addEventListener('click', connectAccount);
 refreshItemsButton.addEventListener('click', loadItems);
 refreshTransactionsButton.addEventListener('click', syncTransactions);
+refreshSubscriptionsButton.addEventListener('click', syncSubscriptions);
 
 loadHealth();
 loadItems();
 loadTransactions();
 loadMonthlyExpenses();
+loadSubscriptions();
